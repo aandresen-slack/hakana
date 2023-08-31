@@ -1,8 +1,61 @@
+diff --git a/hphp/hack/src/decl/cargo/rust_decl_ffi/Cargo.toml b/hphp/hack/src/decl/cargo/rust_decl_ffi/Cargo.toml
+index 8e2c2a13e78..7deac576a18 100644
+--- a/hphp/hack/src/decl/cargo/rust_decl_ffi/Cargo.toml
++++ b/hphp/hack/src/decl/cargo/rust_decl_ffi/Cargo.toml
+@@ -17,9 +17,11 @@ bumpalo = { version = "3.11.1", features = ["collections"] }
+ direct_decl_parser = { version = "0.0.0", path = "../../../parser/api/cargo/direct_decl_parser" }
+ hh_hash = { version = "0.0.0", path = "../../../utils/hh_hash" }
+ ocamlrep = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+-ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+ ocamlrep_ocamlpool = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+ oxidized = { version = "0.0.0", path = "../../../oxidized" }
+ oxidized_by_ref = { version = "0.0.0", path = "../../../oxidized_by_ref" }
+ parser_core_types = { version = "0.0.0", path = "../../../parser/cargo/core_types" }
+ relative_path = { version = "0.0.0", path = "../../../utils/rust/relative_path" }
++
++[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
++ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+\ No newline at end of file
+diff --git a/hphp/hack/src/deps/rust/file_info.rs b/hphp/hack/src/deps/rust/file_info.rs
+index 413f67e467e..122c094ba64 100644
+--- a/hphp/hack/src/deps/rust/file_info.rs
++++ b/hphp/hack/src/deps/rust/file_info.rs
+@@ -13,7 +13,7 @@ use no_pos_hash::NoPosHash;
+ use ocamlrep::FromOcamlRep;
+ use ocamlrep::FromOcamlRepIn;
+ use ocamlrep::ToOcamlRep;
+-use ocamlrep_caml_builtins::Int64;
++//use ocamlrep_caml_builtins::Int64;
+ use serde::Deserialize;
+ use serde::Serialize;
+ 
+@@ -121,7 +121,7 @@ pub enum Pos {
+ )]
+ #[rust_to_ocaml(attr = "deriving (eq, show)")]
+ #[repr(C)]
+-pub struct Id(pub Pos, pub String, pub Option<Int64>);
++pub struct Id(pub Pos, pub String, pub Option<u64>);
+ 
+ #[derive(
+     Clone,
+@@ -140,7 +140,7 @@ pub struct Id(pub Pos, pub String, pub Option<Int64>);
+ )]
+ #[rust_to_ocaml(attr = "deriving eq")]
+ #[repr(C)]
+-pub struct HashType(pub Option<Int64>);
++pub struct HashType(pub Option<u64>);
+ 
+ /// The record produced by the parsing phase.
+ #[derive(
 diff --git a/hphp/hack/src/deps/rust/file_info/Cargo.toml b/hphp/hack/src/deps/rust/file_info/Cargo.toml
-index 88169ea2555..be640945fa1 100644
+index 88169ea2555..e186d05a834 100644
 --- a/hphp/hack/src/deps/rust/file_info/Cargo.toml
 +++ b/hphp/hack/src/deps/rust/file_info/Cargo.toml
-@@ -19,7 +19,9 @@ ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook
+@@ -15,11 +15,13 @@ eq_modulo_pos = { version = "0.0.0", path = "../../../utils/eq_modulo_pos" }
+ naming_types = { version = "0.0.0", path = "../../../naming/rust/naming_types" }
+ no_pos_hash = { version = "0.0.0", path = "../../../utils/no_pos_hash" }
+ ocamlrep = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+-ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
  parser_core_types = { version = "0.0.0", path = "../../../parser/cargo/core_types" }
  rc_pos = { version = "0.0.0", path = "../../../utils/rust/pos" }
  relative_path = { version = "0.0.0", path = "../../../utils/rust/relative_path" }
@@ -13,6 +66,7 @@ index 88169ea2555..be640945fa1 100644
 +
 +[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 +rusqlite = { version = "0.29.0", features = ["backup", "blob", "column_decltype", "limits"] }
++ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
 \ No newline at end of file
 diff --git a/hphp/hack/src/deps/rust/file_info_lib.rs b/hphp/hack/src/deps/rust/file_info_lib.rs
 index a7681402058..e294b709695 100644
@@ -146,6 +200,82 @@ index c6da9b503e4..64a8c2caf9a 100644
          self.span.accept(c, v)?;
          self.emit_id.accept(c, v)?;
          self.is_ctx.accept(c, v)?;
+diff --git a/hphp/hack/src/oxidized/lib.rs b/hphp/hack/src/oxidized/lib.rs
+index 6b89bf88bb8..00242f8bd3d 100644
+--- a/hphp/hack/src/oxidized/lib.rs
++++ b/hphp/hack/src/oxidized/lib.rs
+@@ -3,7 +3,7 @@
+ // This source code is licensed under the MIT license found in the
+ // LICENSE file in the "hack" directory of this source tree.
+ #![feature(box_patterns)]
+-#![feature(drain_filter)]
++#![feature(extract_if)]
+ 
+ #[macro_use]
+ extern crate rust_to_ocaml_attr;
+diff --git a/hphp/hack/src/oxidized/manual/custom_error_config_impl.rs b/hphp/hack/src/oxidized/manual/custom_error_config_impl.rs
+index 30d98a66d71..d6914543ba2 100644
+--- a/hphp/hack/src/oxidized/manual/custom_error_config_impl.rs
++++ b/hphp/hack/src/oxidized/manual/custom_error_config_impl.rs
+@@ -39,7 +39,7 @@ use crate::validation_err::ValidationErr;
+ impl CustomErrorConfig {
+     pub fn new(mut errors: Vec<CustomError>) -> Self {
+         let invalid = errors
+-            .drain_filter(|e| {
++            .extract_if(|e| {
+                 let mut env = ValidationEnv::default();
+                 !e.validate(&mut env)
+             })
+diff --git a/hphp/hack/src/oxidized_by_ref/Cargo.toml b/hphp/hack/src/oxidized_by_ref/Cargo.toml
+index de0a509ccff..4b7bd0f2947 100644
+--- a/hphp/hack/src/oxidized_by_ref/Cargo.toml
++++ b/hphp/hack/src/oxidized_by_ref/Cargo.toml
+@@ -20,12 +20,14 @@ hh24_types = { version = "0.0.0", path = "../utils/hh24_types" }
+ hh_hash = { version = "0.0.0", path = "../utils/hh_hash" }
+ no_pos_hash = { version = "0.0.0", path = "../utils/no_pos_hash" }
+ ocamlrep = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+-ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+ oxidized = { version = "0.0.0", path = "../oxidized" }
+ relative_path = { version = "0.0.0", path = "../utils/rust/relative_path" }
+ rust_to_ocaml_attr = { version = "0.0.0", path = "../rust_to_ocaml/rust_to_ocaml_attr" }
+ serde = { version = "1.0.185", features = ["derive", "rc"] }
+ 
++[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
++ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
++
+ [dev-dependencies]
+ pretty_assertions = { version = "1.2", features = ["alloc"], default-features = false }
+ serde_json = { version = "1.0.100", features = ["float_roundtrip", "unbounded_depth"] }
+diff --git a/hphp/hack/src/oxidized_by_ref/gen/file_info.rs b/hphp/hack/src/oxidized_by_ref/gen/file_info.rs
+index 8f0334726fc..b3cd4c553ef 100644
+--- a/hphp/hack/src/oxidized_by_ref/gen/file_info.rs
++++ b/hphp/hack/src/oxidized_by_ref/gen/file_info.rs
+@@ -13,7 +13,6 @@ use eq_modulo_pos::EqModuloPos;
+ use no_pos_hash::NoPosHash;
+ use ocamlrep::FromOcamlRepIn;
+ use ocamlrep::ToOcamlRep;
+-use ocamlrep_caml_builtins::Int64;
+ pub use oxidized::file_info::Mode;
+ pub use oxidized::file_info::NameType;
+ pub use prim_defs::*;
+@@ -80,7 +79,7 @@ arena_deserializer::impl_deserialize_in_arena!(Pos<'arena>);
+ pub struct Id<'a>(
+     #[serde(deserialize_with = "arena_deserializer::arena", borrow)] pub Pos<'a>,
+     #[serde(deserialize_with = "arena_deserializer::arena", borrow)] pub &'a str,
+-    #[serde(deserialize_with = "arena_deserializer::arena", borrow)] pub Option<&'a Int64>,
++    #[serde(deserialize_with = "arena_deserializer::arena", borrow)] pub Option<&'a u64>,
+ );
+ impl<'a> TrivialDrop for Id<'a> {}
+ arena_deserializer::impl_deserialize_in_arena!(Id<'arena>);
+@@ -103,7 +102,7 @@ arena_deserializer::impl_deserialize_in_arena!(Id<'arena>);
+ #[rust_to_ocaml(attr = "deriving eq")]
+ #[repr(C)]
+ pub struct HashType<'a>(
+-    #[serde(deserialize_with = "arena_deserializer::arena", borrow)] pub Option<&'a Int64>,
++    #[serde(deserialize_with = "arena_deserializer::arena", borrow)] pub Option<&'a u64>,
+ );
+ impl<'a> TrivialDrop for HashType<'a> {}
+ arena_deserializer::impl_deserialize_in_arena!(HashType<'arena>);
 diff --git a/hphp/hack/src/oxidized_by_ref/manual/pos.rs b/hphp/hack/src/oxidized_by_ref/manual/pos.rs
 index 33ba4ae40cf..bebe6e2e909 100644
 --- a/hphp/hack/src/oxidized_by_ref/manual/pos.rs
@@ -443,6 +573,95 @@ index 88c2e445a47..7aab53c3f1c 100644
                          if !(in_block || in_hhi || self.allowed_decl_fixme_codes.contains(&code)) {
                              acc.add_to_misuses(line, code, p);
                          } else if self.disable_hh_ignore_error == 1 && t.kind() == IgnoreError {
+diff --git a/hphp/hack/src/providers/hackrs_provider_backend/Cargo.toml b/hphp/hack/src/providers/hackrs_provider_backend/Cargo.toml
+index 9222ad8eac1..e332c3999be 100644
+--- a/hphp/hack/src/providers/hackrs_provider_backend/Cargo.toml
++++ b/hphp/hack/src/providers/hackrs_provider_backend/Cargo.toml
+@@ -23,7 +23,6 @@ names = { version = "0.0.0", path = "../../naming/names_rust" }
+ naming_provider = { version = "0.0.0", path = "../../hackrs/naming_provider/cargo/naming_provider" }
+ ocaml_runtime = { version = "0.0.0", path = "../../utils/ocaml_runtime" }
+ ocamlrep = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+-ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+ ocamlrep_ocamlpool = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+ oxidized = { version = "0.0.0", path = "../../oxidized" }
+ oxidized_by_ref = { version = "0.0.0", path = "../../oxidized_by_ref" }
+@@ -35,6 +34,9 @@ shallow_decl_provider = { version = "0.0.0", path = "../../hackrs/shallow_decl_p
+ shm_store = { version = "0.0.0", path = "../../shmffi/cargo/shm_store" }
+ ty = { version = "0.0.0", path = "../../hackrs/ty/cargo/ty" }
+ 
++[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
++ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
++
+ [dev-dependencies]
+ hh24_test = { version = "0.0.0", path = "../../utils/cargo/hh24_test" }
+ libc = "0.2.139"
+diff --git a/hphp/hack/src/utils/arena_deserializer/Cargo.toml b/hphp/hack/src/utils/arena_deserializer/Cargo.toml
+index eaca9cd059c..6a697f0fb42 100644
+--- a/hphp/hack/src/utils/arena_deserializer/Cargo.toml
++++ b/hphp/hack/src/utils/arena_deserializer/Cargo.toml
+@@ -11,5 +11,7 @@ path = "lib.rs"
+ [dependencies]
+ bstr = { version = "1.4.0", features = ["serde", "std", "unicode"] }
+ bumpalo = { version = "3.11.1", features = ["collections"] }
+-ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+ serde = { version = "1.0.185", features = ["derive", "rc"] }
++
++[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
++ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+\ No newline at end of file
+diff --git a/hphp/hack/src/utils/arena_deserializer/impls.rs b/hphp/hack/src/utils/arena_deserializer/impls.rs
+index 671fb6c2b3e..2fe88b076d4 100644
+--- a/hphp/hack/src/utils/arena_deserializer/impls.rs
++++ b/hphp/hack/src/utils/arena_deserializer/impls.rs
+@@ -8,7 +8,7 @@ use std::marker::PhantomData;
+ 
+ use bumpalo::collections::Vec as ArenaVec;
+ use bumpalo::Bump;
+-use ocamlrep_caml_builtins::Int64;
++//use ocamlrep_caml_builtins::Int64;
+ use serde::de::Deserializer;
+ use serde::de::SeqAccess;
+ use serde::de::Visitor;
+@@ -95,7 +95,7 @@ impl_deserialize_in_arena!(usize);
+ impl_deserialize_in_arena!(f32);
+ impl_deserialize_in_arena!(f64);
+ impl_deserialize_in_arena!(char);
+-impl_deserialize_in_arena!(Int64);
++//impl_deserialize_in_arena!(Int64);
+ 
+ impl<'arena> DeserializeInArena<'arena> for &'arena str {
+     fn deserialize_in_arena<D>(arena: &'arena Bump, deserializer: D) -> Result<Self, D::Error>
+diff --git a/hphp/hack/src/utils/eq_modulo_pos/Cargo.toml b/hphp/hack/src/utils/eq_modulo_pos/Cargo.toml
+index b04af07f495..22ec5903b71 100644
+--- a/hphp/hack/src/utils/eq_modulo_pos/Cargo.toml
++++ b/hphp/hack/src/utils/eq_modulo_pos/Cargo.toml
+@@ -14,4 +14,6 @@ bstr = { version = "1.4.0", features = ["serde", "std", "unicode"] }
+ eq_modulo_pos_derive = { version = "0.0.0", path = "../eq_modulo_pos_derive" }
+ hcons = { version = "0.0.0", path = "../../hcons" }
+ indexmap = { version = "1.9.2", features = ["arbitrary", "rayon", "serde-1"] }
++
++[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+diff --git a/hphp/hack/src/utils/eq_modulo_pos/eq_modulo_pos.rs b/hphp/hack/src/utils/eq_modulo_pos/eq_modulo_pos.rs
+index 0e00043925c..daee5924305 100644
+--- a/hphp/hack/src/utils/eq_modulo_pos/eq_modulo_pos.rs
++++ b/hphp/hack/src/utils/eq_modulo_pos/eq_modulo_pos.rs
+@@ -7,7 +7,6 @@ use std::rc::Rc;
+ use std::sync::Arc;
+ 
+ pub use eq_modulo_pos_derive::EqModuloPos;
+-use ocamlrep_caml_builtins::Int64;
+ 
+ /// An implementation of `Eq` which is insensitive to positions
+ /// (e.g., `pos::BPos`) and reasons (e.g., `ty::reason::BReason`).
+@@ -109,7 +108,6 @@ impl_with_equal! {
+     std::path::PathBuf,
+     bstr::BStr,
+     bstr::BString,
+-    Int64,
+ }
+ 
+ macro_rules! impl_deref {
 diff --git a/hphp/hack/src/utils/hh24_types/hh24_types.rs b/hphp/hack/src/utils/hh24_types/hh24_types.rs
 index 0febd35fe7d..4fd8c642cac 100644
 --- a/hphp/hack/src/utils/hh24_types/hh24_types.rs
@@ -462,6 +681,38 @@ index 0febd35fe7d..4fd8c642cac 100644
          impl rusqlite::types::FromSql for $name {
              fn column_result(
                  value: rusqlite::types::ValueRef<'_>,
+diff --git a/hphp/hack/src/utils/no_pos_hash/Cargo.toml b/hphp/hack/src/utils/no_pos_hash/Cargo.toml
+index 984651cd175..425d6548039 100644
+--- a/hphp/hack/src/utils/no_pos_hash/Cargo.toml
++++ b/hphp/hack/src/utils/no_pos_hash/Cargo.toml
+@@ -13,4 +13,6 @@ arena_collections = { version = "0.0.0", path = "../../arena_collections" }
+ bstr = { version = "1.4.0", features = ["serde", "std", "unicode"] }
+ fnv = "1.0"
+ no_pos_hash_derive = { version = "0.0.0", path = "derive" }
++
++[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ ocamlrep_caml_builtins = { version = "0.1.0", git = "https://github.com/facebook/ocamlrep/", branch = "main" }
+diff --git a/hphp/hack/src/utils/no_pos_hash/no_pos_hash.rs b/hphp/hack/src/utils/no_pos_hash/no_pos_hash.rs
+index 396831e47f5..32693ed0a4b 100644
+--- a/hphp/hack/src/utils/no_pos_hash/no_pos_hash.rs
++++ b/hphp/hack/src/utils/no_pos_hash/no_pos_hash.rs
+@@ -44,8 +44,6 @@ pub fn position_insensitive_hash<T: NoPosHash>(value: &T) -> u64 {
+ }
+ 
+ mod impls {
+-    use ocamlrep_caml_builtins::Int64;
+-
+     use super::*;
+ 
+     impl<T: NoPosHash> NoPosHash for [T] {
+@@ -107,7 +105,6 @@ mod impls {
+         String,
+         std::path::PathBuf,
+         bstr::BString,
+-        Int64,
+     }
+ 
+     macro_rules! impl_with_std_hash_unsized {
 diff --git a/hphp/hack/src/utils/rust/pos/file_pos.rs b/hphp/hack/src/utils/rust/pos/file_pos.rs
 index fff34e9c159..49ae1121f9c 100644
 --- a/hphp/hack/src/utils/rust/pos/file_pos.rs
