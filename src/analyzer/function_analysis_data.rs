@@ -24,7 +24,7 @@ pub struct FunctionAnalysisData {
     pub issues_to_emit: Vec<Issue>,
     pub inferred_return_types: Vec<TUnion>,
     pub fully_matched_switch_offsets: FxHashSet<usize>,
-    pub closures: FxHashMap<Pos, FunctionLikeInfo>,
+    pub closures: FxHashMap<usize, FunctionLikeInfo>,
     pub closure_spans: Vec<(usize, usize)>,
     pub replacements: BTreeMap<(usize, usize), Replacement>,
     pub current_stmt_offset: Option<StmtStart>,

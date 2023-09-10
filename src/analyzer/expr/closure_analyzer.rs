@@ -33,7 +33,6 @@ pub(crate) fn analyze(
         context.clone(),
         analysis_data,
         &mut analysis_result,
-        expr.pos(),
     ) {
         lambda_storage
     } else {

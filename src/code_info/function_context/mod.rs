@@ -1,5 +1,5 @@
 pub use crate::functionlike_identifier::FunctionLikeIdentifier;
-use crate::{symbol_references::ReferenceSource, StrId};
+use crate::{code_location::FilePath, symbol_references::ReferenceSource, StrId};
 
 #[derive(Clone, Debug, Copy)]
 pub struct FunctionContext {
@@ -19,7 +19,7 @@ impl FunctionContext {
         }
     }
 
-    pub fn get_reference_source(&self, file_path: &StrId) -> ReferenceSource {
+    pub fn get_reference_source(&self, file_path: &FilePath) -> ReferenceSource {
         if let Some(calling_functionlike_id) = &self.calling_functionlike_id {
             match calling_functionlike_id {
                 FunctionLikeIdentifier::Function(name) => ReferenceSource::Symbol(false, *name),
@@ -28,7 +28,7 @@ impl FunctionContext {
                 }
             }
         } else {
-            ReferenceSource::Symbol(false, *file_path)
+            ReferenceSource::Symbol(false, file_path.0)
         }
     }
 }

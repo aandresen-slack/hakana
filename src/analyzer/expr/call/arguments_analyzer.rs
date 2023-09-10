@@ -78,7 +78,7 @@ pub(crate) fn check_arguments_match(
                 &statements_analyzer.get_codebase().symbols,
                 &context
                     .function_context
-                    .get_reference_source(&statements_analyzer.get_file_path().0),
+                    .get_reference_source(&statements_analyzer.get_file_path()),
                 &mut analysis_data.symbol_references,
                 false,
             );
@@ -710,6 +710,11 @@ fn handle_closure_arg(
     let mut closure_storage = {
         match functionlike_analyzer::get_closure_storage(
             statements_analyzer.get_file_analyzer(),
+            statements_analyzer.get_codebase(),
+            context
+                .function_context
+                .get_reference_source(&statements_analyzer.get_file_path()),
+            analysis_data,
             closure_expr.1.start_offset(),
         ) {
             None => {
@@ -797,7 +802,7 @@ fn handle_closure_arg(
 
     analysis_data
         .closures
-        .insert(closure_expr.pos().clone(), closure_storage);
+        .insert(closure_expr.pos().start_offset(), closure_storage);
 }
 
 fn map_class_generic_params(

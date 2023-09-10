@@ -682,11 +682,11 @@ fn visit_xhp_attribute(
             oxidized::tast::XhpAttrTag::Required => {
                 stmt_pos.end_offset += 10;
                 stmt_pos.end_column += 10;
-            },
+            }
             oxidized::tast::XhpAttrTag::LateInit => {
                 stmt_pos.end_offset += 11;
                 stmt_pos.end_column += 11;
-            },
+            }
         }
     }
 
@@ -799,6 +799,8 @@ fn visit_class_const_declaration(
         },
         unresolved_value: None,
         is_abstract: matches!(const_node.kind, ClassConstKind::CCAbstract(..)),
+        populated: false,
+        user_defined: classlike_storage.user_defined,
     };
 
     classlike_storage.constants.insert(name, const_storage);

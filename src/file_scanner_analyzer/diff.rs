@@ -4,6 +4,7 @@ use hakana_reflection_info::code_location::FilePath;
 use hakana_reflection_info::codebase_info::CodebaseInfo;
 use hakana_reflection_info::diff::CodebaseDiff;
 use hakana_reflection_info::issue::Issue;
+use hakana_reflection_info::symbol_references::InvalidSymbols;
 use hakana_reflection_info::symbol_references::SymbolReferences;
 use hakana_reflection_info::Interner;
 use hakana_reflection_info::StrId;
@@ -18,6 +19,7 @@ use crate::cache::load_cached_existing_references;
 pub(crate) struct CachedAnalysis {
     pub safe_symbols: FxHashSet<StrId>,
     pub safe_symbol_members: FxHashSet<(StrId, StrId)>,
+    pub safe_symbol_member_signatures: FxHashSet<(StrId, StrId)>,
     pub existing_issues: FxHashMap<FilePath, Vec<Issue>>,
     pub symbol_references: SymbolReferences,
 }
@@ -60,13 +62,16 @@ pub(crate) async fn mark_safe_symbols_from_diff(
             return CachedAnalysis::default();
         };
 
-    let (invalid_symbols_and_members, partially_invalid_symbols) =
-        if let Some(invalid_symbols) = existing_references.get_invalid_symbols(&codebase_diff) {
-            invalid_symbols
-        } else {
-            // this happens when there are too many invalidated symbols
-            return CachedAnalysis::default();
-        };
+    let InvalidSymbols {
+        invalid_symbol_and_member_signatures,
+        invalid_symbol_and_member_bodies,
+        partially_invalid_symbols,
+    } = if let Some(invalid_symbols) = existing_references.get_invalid_symbols(&codebase_diff) {
+        invalid_symbols
+    } else {
+        // this happens when there are too many invalidated symbols
+        return CachedAnalysis::default();
+    };
 
     let mut cached_analysis = CachedAnalysis::default();
 
@@ -74,19 +79,29 @@ pub(crate) async fn mark_safe_symbols_from_diff(
 
     for keep_symbol in &codebase_diff.keep {
         if keep_symbol.1.is_empty() {
-            if !invalid_symbols_and_members.contains(&keep_symbol)
+            if !invalid_symbol_and_member_signatures.contains(&keep_symbol)
+                && !invalid_symbol_and_member_bodies.contains(&keep_symbol)
                 && !partially_invalid_symbols.contains(&keep_symbol.0)
             {
                 cached_analysis.safe_symbols.insert(keep_symbol.0);
             }
         } else {
-            if !invalid_symbols_and_members.contains(&keep_symbol) {
-                cached_analysis
-                    .safe_symbol_members
-                    .insert((keep_symbol.0, keep_symbol.1));
+            if !invalid_symbol_and_member_signatures.contains(&keep_symbol) {
+                if !invalid_symbol_and_member_bodies.contains(&keep_symbol) {
+                    cached_analysis
+                        .safe_symbol_members
+                        .insert((keep_symbol.0, keep_symbol.1));
+                } else {
+                    cached_analysis
+                        .safe_symbol_member_signatures
+                        .insert((keep_symbol.0, keep_symbol.1));
+                }
             }
         }
     }
+
+    let mut invalid_symbols_and_members = invalid_symbol_and_member_signatures.clone();
+    invalid_symbols_and_members.extend(&invalid_symbol_and_member_bodies);
 
     cached_analysis
         .symbol_references

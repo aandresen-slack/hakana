@@ -453,7 +453,7 @@ fn analyze_named_constructor(
                         &statements_analyzer.get_codebase().symbols,
                         &context
                             .function_context
-                            .get_reference_source(&statements_analyzer.get_file_path().0),
+                            .get_reference_source(&statements_analyzer.get_file_path()),
                         &mut analysis_data.symbol_references,
                         false,
                     );
@@ -554,7 +554,7 @@ fn analyze_named_constructor(
                             &statements_analyzer.get_codebase().symbols,
                             &context
                                 .function_context
-                                .get_reference_source(&statements_analyzer.get_file_path().0),
+                                .get_reference_source(&statements_analyzer.get_file_path()),
                             &mut analysis_data.symbol_references,
                             false,
                         );

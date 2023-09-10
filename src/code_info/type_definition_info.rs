@@ -42,4 +42,6 @@ pub struct TypeDefinitionInfo {
     pub generated: bool,
 
     pub attributes: Vec<AttributeInfo>,
+
+    pub populated: bool,
 }

@@ -25,15 +25,15 @@ use hakana_reflection_info::functionlike_info::{FnEffect, FunctionLikeInfo};
 use hakana_reflection_info::issue::{Issue, IssueKind};
 use hakana_reflection_info::member_visibility::MemberVisibility;
 use hakana_reflection_info::method_identifier::MethodIdentifier;
+use hakana_reflection_info::symbol_references::ReferenceSource;
 use hakana_reflection_info::t_atomic::TAtomic;
-use hakana_reflection_info::t_union::TUnion;
+use hakana_reflection_info::t_union::{populate_union_type, TUnion};
 use hakana_reflection_info::{Interner, STR_AWAITABLE};
 use hakana_type::type_comparator::type_comparison_result::TypeComparisonResult;
 use hakana_type::type_expander::{self, StaticClassType, TypeExpansionOptions};
 use hakana_type::{add_optional_union_type, get_mixed_any, get_void, type_comparator, wrap_atomic};
 use itertools::Itertools;
 use oxidized::aast;
-use oxidized::ast_defs::Pos;
 use rustc_hash::FxHashSet;
 
 use std::collections::BTreeMap;
@@ -118,22 +118,23 @@ impl<'a> FunctionLikeAnalyzer<'a> {
         mut context: ScopeContext,
         analysis_data: &mut FunctionAnalysisData,
         analysis_result: &mut AnalysisResult,
-        expr_pos: &Pos,
     ) -> Result<FunctionLikeInfo, AnalysisError> {
-        let lambda_storage = analysis_data.closures.get(expr_pos).cloned();
-
-        let mut lambda_storage = if let Some(lambda_storage) = lambda_storage {
-            lambda_storage
-        } else {
-            match get_closure_storage(&self.file_analyzer, stmt.span.start_offset()) {
-                None => {
-                    return Err(AnalysisError::InternalError(format!(
-                        "Cannot get closure storage at {}",
-                        stmt.span.start_offset()
-                    )));
-                }
-                Some(value) => value,
+        let mut lambda_storage = match get_closure_storage(
+            &self.file_analyzer,
+            &self.get_codebase(),
+            context
+                .function_context
+                .get_reference_source(&self.file_analyzer.get_file_source().file_path),
+            analysis_data,
+            stmt.span.start_offset(),
+        ) {
+            None => {
+                return Err(AnalysisError::InternalError(format!(
+                    "Cannot get closure storage at {}",
+                    stmt.span.start_offset()
+                )));
             }
+            Some(value) => value.clone(),
         };
 
         analysis_data
@@ -1390,16 +1391,51 @@ impl ScopeAnalyzer for FunctionLikeAnalyzer<'_> {
 
 pub(crate) fn get_closure_storage(
     file_analyzer: &FileAnalyzer,
+    codebase: &CodebaseInfo,
+    reference_source: ReferenceSource,
+    analysis_data: &mut FunctionAnalysisData,
     offset: usize,
 ) -> Option<FunctionLikeInfo> {
-    let file_storage = file_analyzer
-        .codebase
-        .files
-        .get(&file_analyzer.get_file_source().file_path);
-
-    if let Some(file_storage) = file_storage {
-        file_storage.closure_infos.get(&offset).cloned()
+    if let Some(functionlike_info) = analysis_data.closures.get(&offset) {
+        Some(functionlike_info.clone())
     } else {
-        return None;
+        let file_storage = file_analyzer
+            .codebase
+            .files
+            .get(&file_analyzer.get_file_source().file_path);
+
+        if let Some(file_storage) = file_storage {
+            if let Some(mut functionlike_info) = file_storage.closure_infos.get(&offset).cloned() {
+                if let Some(ref mut return_type) = functionlike_info.return_type {
+                    populate_union_type(
+                        return_type,
+                        &codebase.symbols,
+                        &reference_source,
+                        &mut analysis_data.symbol_references,
+                        true,
+                    );
+                }
+
+                for param in functionlike_info.params.iter_mut() {
+                    if let Some(ref mut param_type) = param.signature_type {
+                        populate_union_type(
+                            param_type,
+                            &codebase.symbols,
+                            &reference_source,
+                            &mut analysis_data.symbol_references,
+                            true,
+                        );
+                    }
+                }
+
+                analysis_data.closures.insert(offset, functionlike_info);
+
+                analysis_data.closures.get(&offset).cloned()
+            } else {
+                None
+            }
+        } else {
+            return None;
+        }
     }
 }

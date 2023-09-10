@@ -32,6 +32,12 @@ pub struct SymbolReferences {
         FxHashMap<FunctionLikeIdentifier, FxHashSet<FunctionLikeIdentifier>>,
 }
 
+pub struct InvalidSymbols {
+    pub invalid_symbol_and_member_signatures: FxHashSet<(StrId, StrId)>,
+    pub invalid_symbol_and_member_bodies: FxHashSet<(StrId, StrId)>,
+    pub partially_invalid_symbols: FxHashSet<StrId>,
+}
+
 impl SymbolReferences {
     pub fn new() -> Self {
         Self {
@@ -302,10 +308,7 @@ impl SymbolReferences {
         referenced_class_members
     }
 
-    pub fn get_invalid_symbols(
-        &self,
-        codebase_diff: &CodebaseDiff,
-    ) -> Option<(FxHashSet<(StrId, StrId)>, FxHashSet<StrId>)> {
+    pub fn get_invalid_symbols(&self, codebase_diff: &CodebaseDiff) -> Option<InvalidSymbols> {
         let mut invalid_symbols = FxHashSet::default();
         let mut invalid_symbol_members = FxHashSet::default();
 
@@ -403,10 +406,13 @@ impl SymbolReferences {
 
         invalid_symbols.extend(invalid_symbol_members);
 
-        invalid_symbols.extend(invalid_symbol_bodies);
-        invalid_symbols.extend(invalid_symbol_member_bodies);
+        invalid_symbol_bodies.extend(invalid_symbol_member_bodies);
 
-        Some((invalid_symbols, partially_invalid_symbols))
+        Some(InvalidSymbols {
+            invalid_symbol_and_member_signatures: invalid_symbols,
+            invalid_symbol_and_member_bodies: invalid_symbol_bodies,
+            partially_invalid_symbols,
+        })
     }
 
     pub fn remove_references_from_invalid_symbols(

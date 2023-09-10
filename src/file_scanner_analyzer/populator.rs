@@ -18,6 +18,7 @@ pub fn populate_codebase(
     interner: &Interner,
     symbol_references: &mut SymbolReferences,
     safe_symbols: &FxHashSet<StrId>,
+    safe_symbol_member_signatures: &FxHashSet<(StrId, StrId)>,
 ) {
     let mut all_classlike_descendants = FxHashMap::default();
 
@@ -25,14 +26,15 @@ pub fn populate_codebase(
         .classlike_infos
         .iter()
         .filter(|(name, storage)| {
-            !storage.is_populated || (storage.user_defined && !safe_symbols.contains(name))
+            !storage.populated || (storage.user_defined && !safe_symbols.contains(name))
         })
         .map(|(k, _)| k.clone())
         .collect::<Vec<_>>();
 
     for k in &new_classlike_names {
         if let Some(classlike_info) = codebase.classlike_infos.get_mut(k) {
-            classlike_info.is_populated = false;
+            classlike_info.populated = false;
+            classlike_info.populated_descendant_types = false;
         }
     }
 
@@ -46,48 +48,68 @@ pub fn populate_codebase(
         );
     }
 
-    for (name, v) in codebase.functionlike_infos.iter_mut() {
+    for (name, storage) in codebase.functionlike_infos.iter_mut() {
+        if safe_symbols.contains(name) {
+            continue;
+        }
+
+        if !storage.user_defined && storage.populated {
+            continue;
+        }
+
         populate_functionlike_storage(
-            v,
+            storage,
             &codebase.symbols,
             &ReferenceSource::Symbol(true, *name),
             symbol_references,
-            v.user_defined && !safe_symbols.contains(name),
         );
     }
 
     for (name, storage) in codebase.classlike_infos.iter_mut() {
-        let userland_force_repopulation = storage.user_defined && safe_symbols.contains(name);
+        if safe_symbols.contains(name) {
+            continue;
+        }
+
+        if !storage.user_defined && storage.populated_descendant_types {
+            continue;
+        }
 
         for (method_name, v) in storage.methods.iter_mut() {
+            if safe_symbol_member_signatures.contains(&(*name, *method_name)) {
+                continue;
+            }
+
             populate_functionlike_storage(
                 v,
                 &codebase.symbols,
                 &ReferenceSource::ClasslikeMember(true, *name, *method_name),
                 symbol_references,
-                userland_force_repopulation,
             );
         }
 
         for (prop_name, v) in storage.properties.iter_mut() {
+            if safe_symbol_member_signatures.contains(&(*name, *prop_name)) {
+                continue;
+            }
+
             populate_union_type(
                 &mut v.type_,
                 &codebase.symbols,
                 &ReferenceSource::ClasslikeMember(true, *name, *prop_name),
                 symbol_references,
-                userland_force_repopulation,
+                true,
             );
         }
 
         for (_, map) in storage.template_extended_params.iter_mut() {
             for (_, v) in map {
-                if v.needs_population() || userland_force_repopulation {
+                if v.needs_population() {
                     populate_union_type(
                         Arc::make_mut(v),
                         &codebase.symbols,
                         &ReferenceSource::Symbol(true, *name),
                         symbol_references,
-                        userland_force_repopulation,
+                        true,
                     );
                 }
             }
@@ -95,31 +117,39 @@ pub fn populate_codebase(
 
         for (_, map) in storage.template_types.iter_mut() {
             for (_, v) in map {
-                if v.needs_population() || userland_force_repopulation {
+                if v.needs_population() {
                     populate_union_type(
                         Arc::make_mut(v),
                         &codebase.symbols,
                         &ReferenceSource::Symbol(true, *name),
                         symbol_references,
-                        userland_force_repopulation,
+                        true,
                     );
                 }
             }
         }
 
-        for (_, constant) in storage.constants.iter_mut() {
+        for (constant_name, constant) in storage.constants.iter_mut() {
+            if safe_symbol_member_signatures.contains(&(*name, *constant_name)) {
+                continue;
+            }
+
             if let Some(provided_type) = constant.provided_type.as_mut() {
                 populate_union_type(
                     provided_type,
                     &codebase.symbols,
                     &ReferenceSource::Symbol(true, *name),
                     symbol_references,
-                    userland_force_repopulation,
+                    true,
                 );
             }
         }
 
-        for (_, type_constant_info) in storage.type_constants.iter_mut() {
+        for (typedef_name, type_constant_info) in storage.type_constants.iter_mut() {
+            if safe_symbol_member_signatures.contains(&(*name, *typedef_name)) {
+                continue;
+            }
+
             match type_constant_info {
                 ClassConstantType::Concrete(type_) | ClassConstantType::Abstract(Some(type_)) => {
                     populate_union_type(
@@ -127,7 +157,7 @@ pub fn populate_codebase(
                         &codebase.symbols,
                         &ReferenceSource::Symbol(true, *name),
                         symbol_references,
-                        userland_force_repopulation,
+                        true,
                     );
                 }
                 _ => {}
@@ -140,7 +170,7 @@ pub fn populate_codebase(
                 &codebase.symbols,
                 &ReferenceSource::Symbol(true, *name),
                 symbol_references,
-                userland_force_repopulation,
+                true,
             );
         }
 
@@ -150,12 +180,20 @@ pub fn populate_codebase(
                 &codebase.symbols,
                 &ReferenceSource::Symbol(true, *name),
                 symbol_references,
-                userland_force_repopulation,
+                true,
             );
         }
+
+        storage.populated_descendant_types = true;
     }
 
     for (name, type_alias) in codebase.type_definitions.iter_mut() {
+        if type_alias.populated && !type_alias.user_defined || safe_symbols.contains(name) {
+            continue;
+        }
+
+        type_alias.populated = true;
+
         for attribute_info in &type_alias.attributes {
             symbol_references.add_symbol_reference_to_symbol(*name, attribute_info.name, true);
         }
@@ -165,7 +203,7 @@ pub fn populate_codebase(
             &codebase.symbols,
             &ReferenceSource::Symbol(true, *name),
             symbol_references,
-            type_alias.user_defined && !safe_symbols.contains(name),
+            true,
         );
 
         if let Some(ref mut as_type) = type_alias.as_type {
@@ -174,33 +212,31 @@ pub fn populate_codebase(
                 &codebase.symbols,
                 &ReferenceSource::Symbol(true, *name),
                 symbol_references,
-                type_alias.user_defined && !safe_symbols.contains(name),
+                true,
             );
         }
     }
 
     for (name, constant) in codebase.constant_infos.iter_mut() {
+        if safe_symbols.contains(name) {
+            continue;
+        }
+
+        if !constant.user_defined && constant.populated {
+            continue;
+        }
+
         if let Some(provided_type) = constant.provided_type.as_mut() {
             populate_union_type(
                 provided_type,
                 &codebase.symbols,
                 &ReferenceSource::Symbol(true, *name),
                 symbol_references,
-                !safe_symbols.contains(name),
+                true,
             );
         }
-    }
 
-    for (name, file_info) in codebase.files.iter_mut() {
-        for (_, functionlike_info) in file_info.closure_infos.iter_mut() {
-            populate_functionlike_storage(
-                functionlike_info,
-                &codebase.symbols,
-                &ReferenceSource::Symbol(true, name.0),
-                symbol_references,
-                false,
-            );
-        }
+        constant.populated = true;
     }
 
     for (classlike_name, classlike_storage) in &codebase.classlike_infos {
@@ -236,13 +272,8 @@ fn populate_functionlike_storage(
     codebase_symbols: &Symbols,
     reference_source: &ReferenceSource,
     symbol_references: &mut SymbolReferences,
-    force_type_population: bool,
 ) {
-    if storage.is_populated && !force_type_population {
-        return;
-    }
-
-    storage.is_populated = true;
+    storage.populated = true;
 
     for attribute_info in &storage.attributes {
         match reference_source {
@@ -260,7 +291,7 @@ fn populate_functionlike_storage(
             &codebase_symbols,
             reference_source,
             symbol_references,
-            force_type_population,
+            true,
         );
     }
 
@@ -271,7 +302,7 @@ fn populate_functionlike_storage(
                 &codebase_symbols,
                 reference_source,
                 symbol_references,
-                force_type_population,
+                true,
             );
         }
 
@@ -291,15 +322,13 @@ fn populate_functionlike_storage(
 
     for (_, type_param_map) in storage.template_types.iter_mut() {
         for (_, v) in type_param_map {
-            if force_type_population || v.needs_population() {
-                populate_union_type(
-                    Arc::make_mut(v),
-                    &codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force_type_population,
-                );
-            }
+            populate_union_type(
+                Arc::make_mut(v),
+                &codebase_symbols,
+                reference_source,
+                symbol_references,
+                true,
+            );
         }
     }
 
@@ -309,7 +338,7 @@ fn populate_functionlike_storage(
             &codebase_symbols,
             reference_source,
             symbol_references,
-            force_type_population,
+            true,
         );
     }
 }
@@ -327,7 +356,7 @@ fn populate_classlike_storage(
         return;
     };
 
-    if storage.is_populated {
+    if storage.populated {
         codebase
             .classlike_infos
             .insert(classlike_name.clone(), storage);
@@ -432,7 +461,7 @@ fn populate_classlike_storage(
         }
     }
 
-    storage.is_populated = true;
+    storage.populated = true;
 
     codebase
         .classlike_infos

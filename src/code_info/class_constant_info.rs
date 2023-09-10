@@ -17,4 +17,8 @@ pub struct ConstantInfo {
     pub unresolved_value: Option<UnresolvedConstantComponent>,
 
     pub is_abstract: bool,
+
+    pub populated: bool,
+
+    pub user_defined: bool,
 }

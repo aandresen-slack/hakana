@@ -147,6 +147,7 @@ pub async fn scan_and_analyze(
     let mut safe_symbol_members = FxHashSet::default();
     let mut existing_issues = FxHashMap::default();
     let mut symbol_references = SymbolReferences::new();
+    let mut safe_symbol_member_signatures = FxHashSet::default();
 
     if config.ast_diff {
         let cached_analysis = mark_safe_symbols_from_diff(
@@ -165,6 +166,7 @@ pub async fn scan_and_analyze(
         safe_symbol_members = cached_analysis.safe_symbol_members;
         existing_issues = cached_analysis.existing_issues;
         symbol_references = cached_analysis.symbol_references;
+        safe_symbol_member_signatures = cached_analysis.safe_symbol_member_signatures;
     }
 
     logger.log("Calculating symbol inheritance").await;
@@ -176,6 +178,7 @@ pub async fn scan_and_analyze(
         &interner,
         &mut symbol_references,
         &safe_symbols,
+        &safe_symbol_member_signatures,
     );
 
     let populating_elapsed = populating_now.elapsed();

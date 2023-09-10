@@ -36,7 +36,9 @@ pub struct ClassLikeInfo {
      */
     pub aliases: Option<Aliases>,
 
-    pub is_populated: bool,
+    pub populated: bool,
+
+    pub populated_descendant_types: bool,
 
     pub is_stubbed: bool,
 
@@ -215,7 +217,8 @@ impl ClassLikeInfo {
     pub fn new(name: StrId, def_location: HPos, name_location: HPos) -> ClassLikeInfo {
         ClassLikeInfo {
             constants: IndexMap::default(),
-            is_populated: false,
+            populated: false,
+            populated_descendant_types: false,
             is_stubbed: false,
             is_deprecated: false,
             is_abstract: false,

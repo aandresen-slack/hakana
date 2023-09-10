@@ -183,6 +183,8 @@ impl<'ast> Visitor<'ast> for Scanner<'_> {
                 ),
                 unresolved_value: None,
                 is_abstract: false,
+                populated: false,
+                user_defined: self.user_defined,
             },
         );
 
@@ -354,6 +356,7 @@ impl<'ast> Visitor<'ast> for Scanner<'_> {
             location: definition_location,
             user_defined: self.user_defined,
             attributes,
+            populated: false,
         };
 
         if let Some(shape_source_attribute) = shape_source_attribute {

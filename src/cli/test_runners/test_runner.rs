@@ -207,6 +207,8 @@ impl TestRunner {
         build_checksum: &str,
         previous_scan_data: Option<SuccessfulScanData>,
         previous_analysis_result: Option<AnalysisResult>,
+        total_time_in_scanning: &mut Duration,
+        total_time_in_populating: &mut Duration,
         total_time_in_analysis: &mut Duration,
     ) -> (String, Option<SuccessfulScanData>, Option<AnalysisResult>) {
         if dir.contains("skipped-") || dir.contains("SKIPPED-") {
